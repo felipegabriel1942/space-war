@@ -4,39 +4,53 @@ const ctx = canvas.getContext('2d');
 const spaceshipHeight = 40;
 const spaceshipWidth = 40;
 
-let xSpeed = (canvas.width - spaceshipWidth) / 2;
+let playerElement = document.createElement('img');
+playerElement.src = './assets/images/player.png';
 
-var rightPressed = false;
-var leftPressed = false;
-
-let img = document.createElement('img');
-img.src = './assets/images/player.png';
-
-// document.addEventListener('keydown', keyDownHandler, false);
-// document.addEventListener('keyup', keyUpHandler, false);
-
-function drawSpaceship(keys) {
-  if (keys.ArrowRight) {
-    xSpeed += playerXSpeed;
-  } else if (keys.ArrowLeft) {
-    xSpeed -= playerXSpeed;
-  }
-
-  ctx.drawImage(
-    img,
-    xSpeed,
-    canvas.height - spaceshipHeight,
-    spaceshipHeight,
-    spaceshipWidth
-  );
-}
-
+let projectileElement = document.createElement('img');
+projectileElement.src = './assets/images/laserBlue03.png';
 class Vec {
   constructor(x, y) {
     this.x = x;
     this.y = y;
   }
 }
+
+class Level {
+  constructor() {
+    this.gameObjects = [];
+    this.gameObjects.push(Player.create());
+  }
+}
+
+class State {
+  constructor(level, gameObjects, status) {
+    this.level = level;
+    this.gameObjects = gameObjects;
+    this.status = status;
+  }
+
+  static start(level) {
+    return new State(level, level.gameObjects, 'playing');
+  }
+
+  get player() {
+    return this.gameObjects.find((o) => o.type == 'player');
+  }
+}
+
+State.prototype.update = function (time, keys) {
+  console.log(this.gameObjects);
+  let gameObjects = this.gameObjects.map((gameObject) =>
+    gameObject.update(this, keys)
+  );
+
+  if (keys[' ']) {
+    gameObjects.push(Projectile.create());
+  }
+
+  return new State(this.level, gameObjects, this.status);
+};
 
 class Player {
   constructor(pos, speed) {
@@ -50,33 +64,66 @@ class Player {
   }
 
   static create() {
-    return new Player();
+    return new Player(
+      new Vec((canvas.width - spaceshipWidth) / 2, canvas.height - 40),
+      (canvas.width - spaceshipWidth) / 2
+    );
   }
 }
 
 const playerXSpeed = 3;
 
-Player.prototype.update = function (keys) {
-  let xSpeed = 0;
+Player.prototype.update = function (state, keys) {
+  let xSpeed = state.player.speed;
 
-  if (rightPressed) {
+  if (keys.ArrowRight) {
     xSpeed += playerXSpeed;
-  } else if (leftPressed) {
+  } else if (keys.ArrowLeft) {
     xSpeed -= playerXSpeed;
   }
 
-  let img = document.createElement('img');
-  img.src = this.imgSrc;
-
+  // TODO: Deve ser movido pra outro local.
+  // Está aumentando a responsabilidade da função
   ctx.drawImage(
-    img,
+    playerElement,
     xSpeed,
     canvas.height - spaceshipHeight,
     spaceshipHeight,
     spaceshipWidth
   );
 
-  return new Player();
+  return new Player(
+    new Vec((canvas.width - spaceshipWidth) / 2, canvas.height - 40),
+    xSpeed
+  );
+};
+
+class Projectile {
+  constructor(pos, speed) {
+    this.pos = pos;
+    this.speed = speed;
+    this.imgSrc = './assets/images/laserBlue03.png';
+  }
+
+  get type() {
+    return 'projectile';
+  }
+
+  static create(state) {
+    return new Projectile(
+      new Vec((canvas.width - spaceshipWidth) / 2, canvas.height - 40),
+      5
+    );
+  }
+}
+
+Projectile.prototype.update = function (state) {
+  ctx.drawImage(projectileElement, 5, canvas.height - spaceshipHeight, 5, 30);
+
+  return new Projectile(
+    new Vec((canvas.width - spaceshipWidth) / 2, canvas.height - 40),
+    5
+  );
 };
 
 function trackKeys(keys) {
@@ -98,7 +145,7 @@ function trackKeys(keys) {
 function draw(keys) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  drawSpaceship(keys);
+  // drawSpaceship(keys);
 
   // new Player().update();
 }
@@ -124,20 +171,26 @@ function runAnimation(frameFunc) {
   requestAnimationFrame(frame);
 }
 
-function runLevel() {
+function runLevel(level) {
+  let state = State.start(level);
+  console.log(state);
+
   return new Promise((resolve) => {
     const animate = (time) => {
-      draw(arrowKeys);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      state = state.update(time, arrowKeys);
+      // draw(level);
     };
 
-    let arrowKeys = trackKeys(['ArrowLeft', 'ArrowRight']);
+    let arrowKeys = trackKeys(['ArrowLeft', 'ArrowRight', ' ']);
 
     runAnimation(animate);
   });
 }
 
 async function runGame() {
-  await runLevel();
+  const level = new Level();
+  await runLevel(level);
 }
 
 runGame();
